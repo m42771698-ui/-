@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WaterMark Remover — Rex Cloud</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  /* Custom cursor */
+  body { cursor: none; background: #0a0a1a; color: #fff; font-family: 'Segoe UI', sans-serif; min-height: 100vh; overflow-x: hidden; }
+  
+  #cursor {
+    width: 12px; height: 12px;
+    background: #a855f7;
+    border-radius: 50%;
+    position: fixed; top: 0; left: 0;
+    pointer-events: none; z-index: 99999;
+    transform: translate(-50%, -50%);
+    transition: transform .08s, background .2s, width .15s, height .15s;
+    box-shadow: 0 0 10px #a855f7, 0 0 20px rgba(168,85,247,.4);
+  }
+  #cursor-ring {
+    width: 36px; height: 36px;
+    border: 2px solid rgba(168,85,247,.6);
+    border-radius: 50%;
+    position: fixed; top: 0; left: 0;
+    pointer-events: none; z-index: 99998;
+    transform: translate(-50%, -50%);
+    transition: width .25s, height .25s, border-color .25s, opacity .25s;
+  }
+  body:has(.btn:hover) #cursor, body:has(.mode-btn:hover) #cursor, body:has(.tool-btn:hover) #cursor { background: #ec4899; box-shadow: 0 0 14px #ec4899; width: 8px; height: 8px; }
+  body:has(canvas:hover) #cursor { width: 6px; height: 6px; background: #fff; box-shadow: 0 0 8px #fff; }
+  body:has(canvas:hover) #cursor-ring { width: var(--brush-ring, 36px); height: var(--brush-ring, 36px); border-color: rgba(168,85,247,.9); }
+
+  /* BG */
+  .bg {
+    position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(ellipse at 20% 50%, #1e0a3c 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, #0c1a3c 0%, transparent 60%),
+                #050510;
+  }
+  .bg::after {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: radial-gradient(circle, rgba(168,85,247,.08) 1px, transparent 1px);
+    background-size: 30px 30px;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+  /* Header */
+  h1 {
+    text-align: center;
+    font-size: 2.4rem;
+    background: linear-gradient(135deg, #a855f7, #ec4899, #06b6d4);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+  }
+  .subtitle { text-align: center; color: #9ca3af; margin-bottom: 30px; font-size: .95rem; }
+
+  /* 3D Buttons */
+  .btn {
+    cursor: none;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 22px; border: none; border-radius: 12px;
+    font-size: .95rem; font-weight: 600; color: #fff;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform .12s, box-shadow .12s;
+    outline: none;
+  }
+  .btn::after {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 12px;
+    background: rgba(255,255,255,.12);
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .btn:hover::after { opacity: 1; }
+  .btn:active { transform: translateY(3px) scale(.97); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    box-shadow: 0 6px 0 #4c1d95, 0 8px 20px rgba(124,58,237,.5);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #4c1d95, 0 12px 28px rgba(124,58,237,.6); }
+  .btn-primary:active { box-shadow: 0 2px 0 #4c1d95, 0 4px 12px rgba(124,58,237,.4); }
+
+  .btn-success {
+    background: linear-gradient(135deg, #059669, #10b981);
+    box-shadow: 0 6px 0 #064e3b, 0 8px 20px rgba(16,185,129,.5);
+  }
+  .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #064e3b, 0 12px 28px rgba(16,185,129,.6); }
+  .btn-success:active { box-shadow: 0 2px 0 #064e3b, 0 4px 12px rgba(16,185,129,.4); }
+
+  .btn-danger {
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    box-shadow: 0 6px 0 #7f1d1d, 0 8px 20px rgba(239,68,68,.4);
+  }
+  .btn-danger:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #7f1d1d, 0 12px 28px rgba(239,68,68,.5); }
+  .btn-danger:active { box-shadow: 0 2px 0 #7f1d1d; }
+
+  .btn-info {
+    background: linear-gradient(135deg, #0284c7, #06b6d4);
+    box-shadow: 0 6px 0 #0c4a6e, 0 8px 20px rgba(6,182,212,.4);
+  }
+  .btn-info:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #0c4a6e, 0 12px 28px rgba(6,182,212,.5); }
+  .btn-info:active { box-shadow: 0 2px 0 #0c4a6e; }
+
+  .btn-warn {
+    background: linear-gradient(135deg, #b45309, #f59e0b);
+    box-shadow: 0 6px 0 #78350f, 0 8px 20px rgba(245,158,11,.4);
+  }
+  .btn-warn:hover { transform: translateY(-2px); }
+  .btn-warn:active { box-shadow: 0 2px 0 #78350f; }
+
+  /* Mode toggle */
+  .mode-bar {
+    display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .mode-btn {
+    cursor: none;
+    padding: 10px 28px; border: 2px solid rgba(168,85,247,.3);
+    border-radius: 50px; background: rgba(168,85,247,.08);
+    color: #c4b5fd; font-size: .95rem; font-weight: 600;
+    transition: all .2s;
+    transform-style: preserve-3d;
+  }
+  .mode-btn:hover { border-color: #a855f7; background: rgba(168,85,247,.2); transform: translateY(-2px); }
+  .mode-btn.active {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    border-color: transparent; color: #fff;
+    box-shadow: 0 6px 0 #4c1d95, 0 10px 25px rgba(124,58,237,.5);
+    transform: translateY(0);
+  }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start; }
+  @media(max-width: 768px) { .layout { grid-template-columns: 1fr; } }
+
+  /* Panel */
+  .panel {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 20px; padding: 20px;
+    backdrop-filter: blur(10px);
+  }
+  .panel-title { font-size: 1rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; color: #c4b5fd; }
+
+  /* Upload */
+  .upload-zone {
+    cursor: none;
+    border: 2px dashed rgba(168,85,247,.4);
+    border-radius: 14px; padding: 28px 16px;
+    text-align: center; color: #9ca3af;
+    transition: all .2s; margin-bottom: 16px;
+    background: rgba(168,85,247,.04);
+  }
+  .upload-zone:hover { border-color: #a855f7; background: rgba(168,85,247,.1); color: #c4b5fd; }
+  .upload-zone .icon { font-size: 2rem; margin-bottom: 8px; }
+  .upload-zone input { display: none; }
+
+  /* Sliders */
+  .slider-row { margin-bottom: 14px; }
+  .slider-row label { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: .85rem; color: #9ca3af; }
+  .slider-row label span { color: #a855f7; font-weight: 700; }
+  input[type=range] {
+    width: 100%; cursor: none;
+    -webkit-appearance: none; height: 6px;
+    border-radius: 3px; background: rgba(168,85,247,.2);
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px;
+    border-radius: 50%; background: linear-gradient(135deg, #a855f7, #ec4899);
+    box-shadow: 0 2px 8px rgba(168,85,247,.6); cursor: none;
+  }
+
+  /* Tool buttons row */
+  .tool-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tool-btn {
+    cursor: none; flex: 1; min-width: 60px;
+    padding: 8px 6px; border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px; background: rgba(255,255,255,.05);
+    color: #d1d5db; font-size: .8rem; text-align: center;
+    transition: all .15s; transform-style: preserve-3d;
+  }
+  .tool-btn:hover { background: rgba(168,85,247,.2); border-color: #a855f7; transform: translateY(-2px); box-shadow: 0 4px 0 rgba(76,29,149,.5); }
+  .tool-btn.active { background: rgba(168,85,247,.3); border-color: #a855f7; color: #f0abfc; box-shadow: 0 4px 0 rgba(76,29,149,.7); transform: translateY(0); }
+
+  /* Canvas area */
+  .canvas-wrap {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 20px; overflow: hidden;
+    backdrop-filter: blur(10px);
+  }
+  .canvas-tabs {
+    display: flex; border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  .tab {
+    cursor: none; padding: 12px 24px; font-size: .9rem; font-weight: 600;
+    color: #6b7280; border-bottom: 2px solid transparent;
+    transition: all .2s; background: none; border-top: none; border-left: none; border-right: none;
+  }
+  .tab.active { color: #a855f7; border-bottom-color: #a855f7; }
+  .tab:hover { color: #c4b5fd; }
+
+  .canvas-inner { padding: 20px; }
+  .canvas-container { position: relative; display: inline-block; max-width: 100%; }
+  
+  #mainCanvas, #overlayCanvas {
+    border-radius: 10px; max-width: 100%;
+    display: block;
+  }
+  #overlayCanvas {
+    position: absolute; top: 0; left: 0;
+    cursor: none;
+  }
+
+  .placeholder {
+    width: 100%; min-height: 360px;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px; color: #4b5563;
+    border: 1px dashed rgba(255,255,255,.06); border-radius: 12px;
+  }
+  .placeholder .big { font-size: 3rem; }
+
+  /* Auto panel */
+  .auto-info {
+    background: rgba(6,182,212,.08); border: 1px solid rgba(6,182,212,.2);
+    border-radius: 12px; padding: 14px; margin-bottom: 14px; font-size: .85rem; color: #a5f3fc; line-height: 1.6;
+  }
+
+  /* Progress */
+  .progress-bar { height: 6px; background: rgba(255,255,255,.1); border-radius: 3px; overflow: hidden; margin: 10px 0; }
+  .progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, #7c3aed, #a855f7, #ec4899); border-radius: 3px; transition: width .3s; }
+
+  /* Result section */
+  #resultSection { display: none; margin-top: 20px; }
+  .result-box {
+    background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 20px; padding: 20px; text-align: center;
+  }
+  #resultCanvas { border-radius: 12px; max-width: 100%; }
+  .result-actions { display: flex; gap: 12px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+
+  .status { text-align: center; padding: 8px; font-size: .85rem; color: #6b7280; min-height: 30px; }
+  .status.ok { color: #34d399; }
+  .status.err { color: #f87171; }
+
+  /* Comparison slider */
+  .compare-wrap { position: relative; display: inline-block; max-width: 100%; overflow: hidden; border-radius: 12px; }
+  #compareSlider { position: absolute; top: 0; bottom: 0; left: 50%; width: 3px; background: #fff; cursor: ew-resize; z-index: 10; }
+  #compareSlider::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 28px; height: 28px; background: #fff; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<div class="wrap">
+  <h1>✨ WaterMark Remover</h1>
+  <p class="subtitle">Rex Cloud — Удаление водяных знаков с ручной кистью и AI</p>
+
+  <div class="mode-bar">
+    <button class="mode-btn active" id="modeManual" onclick="setMode('manual')">🎨 Ручная кисть</button>
+    <button class="mode-btn" id="modeAuto" onclick="setMode('auto')">🤖 Автоматический AI</button>
+  </div>
+
+  <div class="layout">
+    <!-- LEFT PANEL -->
+    <div>
+      <!-- Upload -->
+      <div class="panel" style="margin-bottom:16px">
+        <div class="panel-title">📸 Загрузка</div>
+        <div class="upload-zone" onclick="document.getElementById('fileInput').click()" id="dropZone">
+          <div class="icon">🖼️</div>
+          <div>Нажми или перетащи</div>
+          <div style="font-size:.8rem;margin-top:4px">PNG, JPG, WEBP</div>
+          <input type="file" id="fileInput" accept="image/*">
+        </div>
+        <button class="btn btn-danger" style="width:100%;justify-content:center" onclick="resetAll()">↺ Сброс</button>
+      </div>
+
+      <!-- Manual controls -->
+      <div class="panel" id="manualPanel">
+        <div class="panel-title">🎛️ Параметры кисти</div>
+        <div class="slider-row">
+          <label>Размер кисти <span id="sizeVal">30px</span></label>
+          <input type="range" id="brushSize" min="5" max="100" value="30" oninput="updateSlider('brushSize','sizeVal','px')">
+        </div>
+        <div class="slider-row">
+          <label>Жёсткость <span id="hardVal">70%</span></label>
+          <input type="range" id="brushHard" min="0" max="100" value="70" oninput="updateSlider('brushHard','hardVal','%')">
+        </div>
+        <div class="slider-row">
+          <label>Сила <span id="forceVal">80%</span></label>
+          <input type="range" id="brushForce" min="10" max="100" value="80" oninput="updateSlider('brushForce','forceVal','%')">
+        </div>
+        <div class="tool-row">
+          <button class="tool-btn active" id="toolBrush" onclick="setTool('brush')">🎨 Кисть</button>
+          <button class="tool-btn" id="toolEraser" onclick="setTool('eraser')">🗑️ Ластик</button>
+          <button class="tool-btn" id="toolClone" onclick="setTool('clone')">📋 Клон</button>
+        </div>
+        <button class="btn btn-warn" style="width:100%;justify-content:center;margin-bottom:10px" onclick="undoLast()">↶ Отменить</button>
+        <button class="btn btn-success" style="width:100%;justify-content:center" onclick="applyManual()">🚀 Применить</button>
+      </div>
+
+      <!-- Auto controls -->
+      <div class="panel" id="autoPanel" style="display:none">
+        <div class="panel-title">🤖 AI Режим</div>
+        <div class="auto-info">AI анализирует изображение, находит водяные знаки и удаляет их автоматически с помощью алгоритма inpainting.</div>
+        <div class="slider-row">
+          <label>Чувствительность <span id="sensitVal">70%</span></label>
+          <input type="range" id="sensitivity" min="10" max="100" value="70" oninput="updateSlider('sensitivity','sensitVal','%')">
+        </div>
+        <div class="slider-row">
+          <label>Радиус обработки <span id="radiusVal">15px</span></label>
+          <input type="range" id="aiRadius" min="5" max="50" value="15" oninput="updateSlider('aiRadius','radiusVal','px')">
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="runAutoRemove()">🤖 Запустить AI</button>
+        <div class="progress-bar" id="progressBar" style="display:none"><div class="progress-fill" id="progressFill"></div></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Canvas -->
+    <div>
+      <div class="canvas-wrap">
+        <div class="canvas-tabs">
+          <button class="tab active" onclick="showTab('editor',this)">✏️ Редактор</button>
+          <button class="tab" onclick="showTab('result',this)">🎯 Результат</button>
+        </div>
+        <div class="canvas-inner">
+          <!-- Editor tab -->
+          <div id="editorTab">
+            <div id="canvasHolder" class="placeholder">
+              <div class="big">🖼️</div>
+              <div>Загрузи изображение чтобы начать</div>
+            </div>
+          </div>
+          <!-- Result tab -->
+          <div id="resultTab" style="display:none">
+            <div id="resultHolder" class="placeholder">
+              <div class="big">🎯</div>
+              <div>Результат появится здесь</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="status" id="statusMsg">Загрузи изображение для начала работы</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Cursor
+const cur = document.getElementById('cursor');
+const ring = document.getElementById('cursor-ring');
+let mx = 0, my = 0, rx = 0, ry = 0;
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cur.style.left = mx+'px'; cur.style.top = my+'px';
+});
+(function animRing() {
+  rx += (mx-rx)*.10; ry += (my-ry)*.10;
+  ring.style.left = rx+'px'; ring.style.top = ry+'px';
+  requestAnimationFrame(animRing);
+})();
+
+// Sync ring size to brush
+function syncBrushCursor() {
+  const sz = +document.getElementById('brushSize').value;
+  const scale = overlayCanvas ? overlayCanvas.getBoundingClientRect().width / overlayCanvas.width : 1;
+  const px = Math.round(sz * scale) + 'px';
+  document.documentElement.style.setProperty('--brush-ring', px);
+}
+document.getElementById('brushSize').addEventListener('input', syncBrushCursor);
+
+// State
+let mode = 'manual';
+let tool = 'brush';
+let imgLoaded = false;
+let origImageData = null;
+let strokes = [];
+let isDrawing = false;
+let lastX = 0, lastY = 0;
+let cloneSource = null;
+let cloneSet = false;
+
+// Canvases
+let mainCanvas, overlayCanvas, mainCtx, overlayCtx;
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('manualPanel').style.display = m === 'manual' ? '' : 'none';
+  document.getElementById('autoPanel').style.display = m === 'auto' ? '' : 'none';
+  document.getElementById('modeManual').classList.toggle('active', m === 'manual');
+  document.getElementById('modeAuto').classList.toggle('active', m === 'auto');
+}
+
+function setTool(t) {
+  tool = t;
+  ['Brush','Eraser','Clone'].forEach(n => document.getElementById('tool'+n).classList.remove('active'));
+  const map = {brush:'Brush',eraser:'Eraser',clone:'Clone'};
+  document.getElementById('tool'+map[t]).classList.add('active');
+  cloneSet = false; cloneSource = null;
+  setStatus(t === 'clone' ? 'Alt+клик для выбора источника клонирования' : '');
+}
+
+function updateSlider(id, label, unit) {
+  document.getElementById(label).textContent = document.getElementById(id).value + unit;
+}
+
+function setStatus(msg, type='') {
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg; el.className = 'status ' + type;
+}
+
+// File input
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) loadImage(e.target.files[0]);
+});
+
+// Drag & drop
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor='#a855f7'; });
+dz.addEventListener('dragleave', () => { dz.style.borderColor=''; });
+dz.addEventListener('drop', e => { e.preventDefault(); dz.style.borderColor=''; if(e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]); });
+
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      setupCanvases(img);
+      imgLoaded = true;
+      setStatus('Изображение загружено! Используй кисть для разметки.', 'ok');
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setupCanvases(img) {
+  const holder = document.getElementById('canvasHolder');
+  holder.innerHTML = '';
+  holder.className = '';
+  holder.style.cssText = 'text-align:center';
+
+  const maxW = holder.parentElement.offsetWidth - 40 || 600;
+  let w = img.width, h = img.height;
+  if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+
+  const container = document.createElement('div');
+  container.className = 'canvas-container';
+  container.style.width = w + 'px';
+
+  mainCanvas = document.createElement('canvas');
+  mainCanvas.id = 'mainCanvas';
+  mainCanvas.width = w; mainCanvas.height = h;
+  mainCtx = mainCanvas.getContext('2d');
+  mainCtx.drawImage(img, 0, 0, w, h);
+  origImageData = mainCtx.getImageData(0, 0, w, h);
+
+  overlayCanvas = document.createElement('canvas');
+  overlayCanvas.id = 'overlayCanvas';
+  overlayCanvas.width = w; overlayCanvas.height = h;
+  overlayCtx = overlayCanvas.getContext('2d');
+
+  container.appendChild(mainCanvas);
+  container.appendChild(overlayCanvas);
+  holder.appendChild(container);
+
+  // Events
+  overlayCanvas.addEventListener('mousedown', onDown);
+  overlayCanvas.addEventListener('mousemove', onMove);
+  overlayCanvas.addEventListener('mouseup', onUp);
+  overlayCanvas.addEventListener('mouseleave', onUp);
+  overlayCanvas.addEventListener('contextmenu', e => { e.preventDefault(); if(tool==='clone') setCloneSource(e); });
+  strokes = [];
+}
+
+function getPos(e) {
+  const r = overlayCanvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (overlayCanvas.width / r.width), y: (e.clientY - r.top) * (overlayCanvas.height / r.height) };
+}
+
+function setCloneSource(e) {
+  const p = getPos(e);
+  cloneSource = p; cloneSet = true;
+  setStatus(`Источник клонирования: ${Math.round(p.x)}, ${Math.round(p.y)}. Теперь рисуй.`, 'ok');
+}
+
+function onDown(e) {
+  if (!imgLoaded) return;
+  if (e.button === 2) { setCloneSource(e); return; }
+  isDrawing = true;
+  const p = getPos(e);
+  lastX = p.x; lastY = p.y;
+  strokes.push({ tool, size: +document.getElementById('brushSize').value, hard: +document.getElementById('brushHard').value, force: +document.getElementById('brushForce').value / 100, points: [p], cloneSrc: cloneSource ? {...cloneSource} : null });
+  drawPoint(p);
+}
+
+function onMove(e) {
+  if (!isDrawing) return;
+  const p = getPos(e);
+  strokes[strokes.length-1].points.push(p);
+  drawStrokeLine(lastX, lastY, p.x, p.y);
+  lastX = p.x; lastY = p.y;
+}
+
+function onUp() { isDrawing = false; }
+
+function drawPoint(p) {
+  const s = strokes[strokes.length-1];
+  drawMark(overlayCtx, p.x, p.y, s);
+}
+
+function drawStrokeLine(x1, y1, x2, y2) {
+  const s = strokes[strokes.length-1];
+  const dist = Math.hypot(x2-x1, y2-y1);
+  const steps = Math.max(1, Math.ceil(dist / 2));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    drawMark(overlayCtx, x1 + (x2-x1)*t, y1 + (y2-y1)*t, s);
+  }
+}
+
+function drawMark(ctx, x, y, s) {
+  if (s.tool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(x, y, s.size/2, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(0,0,0,${s.force})`;
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  } else {
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, s.size/2);
+    const alpha = s.force * (s.hard/100 * 0.8 + 0.2);
+    grad.addColorStop(0, `rgba(168,85,247,${alpha})`);
+    grad.addColorStop(s.hard/100, `rgba(168,85,247,${alpha*0.5})`);
+    grad.addColorStop(1, `rgba(168,85,247,0)`);
+    ctx.beginPath();
+    ctx.arc(x, y, s.size/2, 0, Math.PI*2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+}
+
+function undoLast() {
+  if (!strokes.length) return;
+  strokes.pop();
+  overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  strokes.forEach(s => {
+    s.points.forEach((p, i) => {
+      if (i === 0) { lastX = p.x; lastY = p.y; return; }
+      // Re-draw segments
+      const dist = Math.hypot(p.x-lastX, p.y-lastY);
+      const steps = Math.max(1, Math.ceil(dist/2));
+      for (let j = 1; j <= steps; j++) {
+        const t = j/steps;
+        drawMark(overlayCtx, lastX+(p.x-lastX)*t, lastY+(p.y-lastY)*t, s);
+      }
+      lastX = p.x; lastY = p.y;
+    });
+  });
+  setStatus('Последний штрих отменён');
+}
+
+function getMask() {
+  // Returns mask imageData where marked pixels > threshold
+  const od = overlayCtx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
+  return od;
+}
+
+function applyManual() {
+  if (!imgLoaded) { setStatus('Сначала загрузи изображение!', 'err'); return; }
+  if (!strokes.length) { setStatus('Сначала пометь водяной знак кистью!', 'err'); return; }
+  setStatus('Обработка...');
+
+  const w = mainCanvas.width, h = mainCanvas.height;
+  const src = mainCtx.getImageData(0, 0, w, h);
+  const mask = getMask();
+  const result = new ImageData(new Uint8ClampedArray(src.data), w, h);
+
+  // Inpainting: for each masked pixel, replace with weighted average of nearby unmasked pixels
+  const radius = Math.round(+document.getElementById('brushSize').value * 0.8 + 5);
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = (y * w + x) * 4;
+      const alpha = mask.data[idx + 3];
+      if (alpha < 30) continue;
+
+      let rS=0, gS=0, bS=0, wS=0;
+      const r = Math.min(radius, 40);
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const nx = x+dx, ny = y+dy;
+          if (nx<0||ny<0||nx>=w||ny>=h) continue;
+          const ni = (ny*w+nx)*4;
+          if (mask.data[ni+3] > 30) continue; // skip other masked
+          const dist = Math.sqrt(dx*dx+dy*dy);
+          if (dist > r) continue;
+          const w2 = 1 / (dist + 1);
+          rS += src.data[ni]*w2; gS += src.data[ni+1]*w2; bS += src.data[ni+2]*w2; wS += w2;
+        }
+      }
+      if (wS > 0) {
+        result.data[idx]   = rS/wS;
+        result.data[idx+1] = gS/wS;
+        result.data[idx+2] = bS/wS;
+      }
+    }
+  }
+
+  showResult(result, w, h);
+  setStatus('✅ Водяной знак удалён!', 'ok');
+}
+
+function runAutoRemove() {
+  if (!imgLoaded) { setStatus('Сначала загрузи изображение!', 'err'); return; }
+  const bar = document.getElementById('progressBar');
+  const fill = document.getElementById('progressFill');
+  bar.style.display = '';
+  fill.style.width = '0%';
+  setStatus('AI анализирует изображение...');
+
+  let prog = 0;
+  const interval = setInterval(() => {
+    prog += Math.random() * 18;
+    if (prog > 90) prog = 90;
+    fill.style.width = prog + '%';
+  }, 200);
+
+  setTimeout(() => {
+    clearInterval(interval);
+    fill.style.width = '100%';
+
+    const w = mainCanvas.width, h = mainCanvas.height;
+    const src = mainCtx.getImageData(0, 0, w, h);
+    const result = autoDetectAndRemove(src, w, h);
+    showResult(result, w, h);
+    setTimeout(() => { bar.style.display = 'none'; fill.style.width = '0'; }, 600);
+    setStatus('✅ AI завершил удаление водяных знаков!', 'ok');
+  }, 2200);
+}
+
+function autoDetectAndRemove(src, w, h) {
+  const data = new Uint8ClampedArray(src.data);
+  const sensitivity = +document.getElementById('sensitivity').value / 100;
+  const radius = +document.getElementById('aiRadius').value;
+
+  // Detect semi-transparent / high-brightness / low-saturation pixels (typical watermarks)
+  const mask = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    const r = src.data[i*4], g = src.data[i*4+1], b = src.data[i*4+2];
+    const brightness = (r + g + b) / 3;
+    const maxC = Math.max(r,g,b), minC = Math.min(r,g,b);
+    const saturation = maxC === 0 ? 0 : (maxC - minC) / maxC;
+    // Mark bright low-saturation areas (white/gray watermarks)
+    if (brightness > 200 && saturation < (1 - sensitivity) * 0.6) mask[i] = 1;
+    // Also detect repeating patterns in corners/edges
+    const x = i % w, y = Math.floor(i / w);
+    if ((x < w*0.3 || x > w*0.7) && (y < h*0.3 || y > h*0.7) && brightness > 180 && saturation < 0.3) mask[i] = 1;
+  }
+
+  // Inpaint masked pixels
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y*w+x;
+      if (!mask[i]) continue;
+      let rS=0,gS=0,bS=0,wS=0;
+      for (let dy=-radius; dy<=radius; dy++) {
+        for (let dx=-radius; dx<=radius; dx++) {
+          const nx=x+dx, ny=y+dy;
+          if (nx<0||ny<0||nx>=w||ny>=h) continue;
+          const ni=ny*w+nx;
+          if (mask[ni]) continue;
+          const dist=Math.sqrt(dx*dx+dy*dy);
+          if (dist>radius) continue;
+          const ww=1/(dist+0.5);
+          rS+=src.data[ni*4]*ww; gS+=src.data[ni*4+1]*ww; bS+=src.data[ni*4+2]*ww; wS+=ww;
+        }
+      }
+      if (wS>0) { data[i*4]=rS/wS; data[i*4+1]=gS/wS; data[i*4+2]=bS/wS; }
+    }
+  }
+  return new ImageData(data, w, h);
+}
+
+function showResult(imageData, w, h) {
+  const holder = document.getElementById('resultHolder');
+  holder.innerHTML = '';
+  holder.className = '';
+  holder.style.cssText = 'text-align:center';
+
+  const rc = document.createElement('canvas');
+  rc.width = w; rc.height = h;
+  rc.style.borderRadius = '12px';
+  rc.style.maxWidth = '100%';
+  rc.getContext('2d').putImageData(imageData, 0, 0);
+
+  const actions = document.createElement('div');
+  actions.className = 'result-actions';
+
+  const dlBtn = document.createElement('button');
+  dlBtn.className = 'btn btn-success';
+  dlBtn.innerHTML = '⬇️ Скачать результат';
+  dlBtn.onclick = () => {
+    rc.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'watermark_removed.png';
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 500);
+    }, 'image/png');
+  };
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn btn-info';
+  copyBtn.innerHTML = '📋 Копировать';
+  copyBtn.onclick = () => {
+    rc.toBlob(blob => {
+      navigator.clipboard.write([new ClipboardItem({'image/png': blob})]).then(() => setStatus('Скопировано!', 'ok'));
+    });
+  };
+
+  actions.appendChild(dlBtn);
+  actions.appendChild(copyBtn);
+  holder.appendChild(rc);
+  holder.appendChild(actions);
+
+  // Switch to result tab
+  showTab('result', document.querySelectorAll('.tab')[1]);
+}
+
+function showTab(name, el) {
+  document.getElementById('editorTab').style.display = name==='editor' ? '' : 'none';
+  document.getElementById('resultTab').style.display = name==='result' ? '' : 'none';
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function resetAll() {
+  imgLoaded = false; strokes = [];
+  document.getElementById('canvasHolder').innerHTML = '';
+  document.getElementById('canvasHolder').className = 'placeholder';
+  document.getElementById('canvasHolder').innerHTML = '<div class="big">🖼️</div><div>Загрузи изображение чтобы начать</div>';
+  document.getElementById('resultHolder').innerHTML = '';
+  document.getElementById('resultHolder').className = 'placeholder';
+  document.getElementById('resultHolder').innerHTML = '<div class="big">🎯</div><div>Результат появится здесь</div>';
+  document.getElementById('fileInput').value = '';
+  showTab('editor', document.querySelectorAll('.tab')[0]);
+  setStatus('Сброс выполнен');
+  const bar = document.getElementById('progressBar');
+  if (bar) bar.style.display = 'none';
+}
+</script>
+</body>
+</html>

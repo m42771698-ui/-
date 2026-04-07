@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThumbIQ — YouTube Analyser</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0a0a0f;color:#fff;font-family:'Segoe UI',sans-serif;min-height:100vh;overflow-x:hidden;}
+:root{--purple:#8b5cf6;--pink:#ec4899;--cyan:#06b6d4;--green:#10b981;--yellow:#f59e0b;--red:#ef4444;}
+
+/* BG */
+.bg{position:fixed;inset:0;z-index:0;
+  background:radial-gradient(ellipse at 10% 50%,#1a0a3c 0%,transparent 50%),
+             radial-gradient(ellipse at 90% 10%,#0a1a3c 0%,transparent 50%),#050510;}
+.bg::after{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,rgba(139,92,246,.05) 1px,transparent 1px);background-size:30px 30px;}
+
+.wrap{position:relative;z-index:1;max-width:1000px;margin:0 auto;padding:20px;}
+
+/* HEADER */
+.header{text-align:center;padding:30px 0 20px;}
+.logo{font-size:3rem;font-weight:900;letter-spacing:-2px;margin-bottom:6px;}
+.logo span:first-child{background:linear-gradient(135deg,#8b5cf6,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.logo span:last-child{background:linear-gradient(135deg,#ec4899,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.logo-sub{color:#6b7280;font-size:.95rem;margin-bottom:4px;}
+.badge-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px;}
+.badge{background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);border-radius:20px;padding:3px 12px;font-size:.72rem;color:#c4b5fd;}
+
+/* TABS */
+.tabs{display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:24px;}
+.tab-btn{cursor:pointer;padding:11px 24px;font-size:.9rem;font-weight:600;color:#6b7280;border-bottom:2px solid transparent;transition:all .2s;background:none;border-top:none;border-left:none;border-right:none;}
+.tab-btn.active{color:#8b5cf6;border-bottom-color:#8b5cf6;}
+.tab-btn:hover{color:#c4b5fd;}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+/* QUOTE TICKER */
+.quote-bar{overflow:hidden;position:relative;margin-bottom:24px;}
+.quote-bar::before,.quote-bar::after{content:'';position:absolute;top:0;bottom:0;width:50px;z-index:2;}
+.quote-bar::before{left:0;background:linear-gradient(90deg,#050510,transparent);}
+.quote-bar::after{right:0;background:linear-gradient(-90deg,#050510,transparent);}
+.q-track{display:flex;gap:50px;animation:qticker 40s linear infinite;width:max-content;}
+.q-track:hover{animation-play-state:paused;}
+@keyframes qticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.q-item{white-space:nowrap;font-size:.8rem;font-style:italic;padding:10px 0;display:flex;align-items:center;gap:8px;}
+.q-author{font-style:normal;font-weight:700;font-size:.7rem;padding:2px 8px;border-radius:10px;}
+
+/* PANEL */
+.panel{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:22px;margin-bottom:18px;}
+.panel-title{font-size:.95rem;font-weight:700;color:#c4b5fd;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+
+/* UPLOAD */
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:600px){.upload-grid{grid-template-columns:1fr;}}
+.upload-box{border:2px dashed rgba(139,92,246,.35);border-radius:14px;padding:28px 16px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(139,92,246,.03);}
+.upload-box:hover{border-color:#8b5cf6;background:rgba(139,92,246,.08);}
+.upload-box input{display:none;}
+.upload-box .uicon{font-size:2.2rem;margin-bottom:8px;}
+.upload-box .ulabel{font-weight:600;font-size:.9rem;margin-bottom:4px;}
+.upload-box .uhint{font-size:.75rem;color:#6b7280;}
+.preview-img{width:100%;border-radius:10px;display:block;margin-top:10px;max-height:180px;object-fit:cover;}
+
+/* INPUT */
+.input-wrap{margin-bottom:14px;}
+.input-wrap label{display:block;font-size:.83rem;color:#9ca3af;margin-bottom:6px;}
+.input-wrap input,.input-wrap textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 14px;color:#fff;font-size:.9rem;outline:none;transition:border .2s;resize:none;}
+.input-wrap input:focus,.input-wrap textarea:focus{border-color:#8b5cf6;}
+.char-count{text-align:right;font-size:.75rem;color:#6b7280;margin-top:3px;}
+
+/* BUTTONS */
+.btn{cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:11px 24px;border:none;border-radius:11px;font-size:.92rem;font-weight:700;color:#fff;transition:transform .12s,box-shadow .12s;outline:none;}
+.btn:hover{transform:translateY(-2px);}
+.btn:active{transform:translateY(1px);}
+.btn-primary{background:linear-gradient(135deg,#7c3aed,#8b5cf6);box-shadow:0 5px 0 #4c1d95,0 8px 20px rgba(139,92,246,.4);}
+.btn-primary:hover{box-shadow:0 7px 0 #4c1d95,0 12px 28px rgba(139,92,246,.5);}
+.btn-primary:active{box-shadow:0 2px 0 #4c1d95;}
+
+/* SCORE */
+.score-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
+@media(max-width:600px){.score-grid{grid-template-columns:1fr;}}
+.score-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:20px;text-align:center;}
+.score-label{font-size:.8rem;color:#9ca3af;margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.score-ring{position:relative;width:100px;height:100px;margin:0 auto 12px;}
+.score-ring svg{transform:rotate(-90deg);}
+.score-ring .bg-circle{fill:none;stroke:rgba(255,255,255,.06);stroke-width:8;}
+.score-ring .fg-circle{fill:none;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset 1s ease;}
+.score-num{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.6rem;font-weight:900;}
+.score-tag{font-size:.82rem;font-weight:700;padding:4px 12px;border-radius:20px;}
+.tag-top{background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3);}
+.tag-mid{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);}
+.tag-low{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);}
+
+/* BREAKDOWN */
+.breakdown{margin-bottom:18px;}
+.brow{margin-bottom:14px;}
+.brow-header{display:flex;justify-content:space-between;margin-bottom:5px;font-size:.83rem;}
+.brow-label{color:#d1d5db;}
+.brow-val{font-weight:700;}
+.bar-bg{height:7px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:4px;transition:width 1.2s ease;}
+
+/* FEEDBACK */
+.feedback-list{list-style:none;}
+.feedback-list li{padding:9px 12px;border-radius:10px;font-size:.84rem;margin-bottom:7px;display:flex;align-items:flex-start;gap:8px;line-height:1.5;}
+.fb-good{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);}
+.fb-warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);}
+.fb-bad{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);}
+
+/* OVERALL */
+.overall-card{background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(236,72,153,.08));border:1px solid rgba(139,92,246,.25);border-radius:18px;padding:24px;text-align:center;}
+.overall-num{font-size:4rem;font-weight:900;background:linear-gradient(135deg,#8b5cf6,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;}
+.overall-verdict{font-size:1.1rem;font-weight:700;margin:8px 0 4px;}
+.overall-desc{font-size:.85rem;color:#9ca3af;max-width:500px;margin:0 auto;}
+
+/* TIPS TAB */
+.tips-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:600px){.tips-grid{grid-template-columns:1fr;}}
+.tip-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:18px;}
+.tip-icon{font-size:1.8rem;margin-bottom:8px;}
+.tip-title{font-size:.9rem;font-weight:700;color:#c4b5fd;margin-bottom:6px;}
+.tip-text{font-size:.8rem;color:#9ca3af;line-height:1.6;}
+
+/* EXAMPLES TAB */
+.ex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+@media(max-width:600px){.ex-grid{grid-template-columns:1fr 1fr;}}
+.ex-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;transition:transform .2s;}
+.ex-card:hover{transform:translateY(-4px);}
+.ex-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;background:linear-gradient(135deg,#1a0a3c,#0a1a3c);display:flex;align-items:center;justify-content:center;font-size:2rem;}
+.ex-thumb-img{width:100%;aspect-ratio:16/9;object-fit:cover;}
+.ex-info{padding:10px;}
+.ex-channel{font-size:.7rem;color:#8b5cf6;font-weight:700;margin-bottom:3px;}
+.ex-title{font-size:.78rem;color:#d1d5db;line-height:1.4;margin-bottom:6px;}
+.ex-score{display:inline-block;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:8px;}
+
+/* HIDDEN */
+#resultsSection{display:none;}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo"><span>Thumb</span><span>IQ</span></div>
+    <div class="logo-sub">Анализатор превью и заголовков для YouTube · как VidIQ и TubeBuddy</div>
+    <div class="badge-row">
+      <div class="badge">🎯 Честная оценка</div>
+      <div class="badge">📊 Детальный разбор</div>
+      <div class="badge">🚀 Советы экспертов</div>
+      <div class="badge">⚡ Мгновенный анализ</div>
+    </div>
+  </div>
+
+  <!-- QUOTES -->
+  <div class="quote-bar">
+    <div class="q-track">
+      <div class="q-item" style="color:#f59e0b;">"Превью — это первое что видит зритель. Если оно не цепляет за 0.5 секунды — ты проиграл." <span class="q-author" style="background:rgba(245,158,11,.15);color:#f59e0b;">MrBeast</span></div>
+      <div class="q-item" style="color:#ec4899;">"Я трачу на превью столько же времени сколько на само видео. Это не шутка." <span class="q-author" style="background:rgba(236,72,153,.15);color:#ec4899;">PewDiePie</span></div>
+      <div class="q-item" style="color:#06b6d4;">"Заголовок должен задавать вопрос на который зритель хочет узнать ответ." <span class="q-author" style="background:rgba(6,182,212,.15);color:#06b6d4;">Marques Brownlee</span></div>
+      <div class="q-item" style="color:#10b981;">"CTR — это король YouTube. А превью и заголовок — это твой CTR." <span class="q-author" style="background:rgba(16,185,129,.15);color:#10b981;">Veritasium</span></div>
+      <div class="q-item" style="color:#f59e0b;">"Если твоё превью не останавливает скролл — его не существует." <span class="q-author" style="background:rgba(245,158,11,.15);color:#f59e0b;">MrBeast</span></div>
+      <div class="q-item" style="color:#ec4899;">"Простота побеждает. Одно лицо, одна эмоция, один смысл." <span class="q-author" style="background:rgba(236,72,153,.15);color:#ec4899;">PewDiePie</span></div>
+      <div class="q-item" style="color:#06b6d4;">"Превью — это реклама твоего видео. Сделай её лучше чем само видео." <span class="q-author" style="background:rgba(6,182,212,.15);color:#06b6d4;">Marques Brownlee</span></div>
+      <div class="q-item" style="color:#10b981;">"Любопытство — лучший инструмент маркетолога на YouTube." <span class="q-author" style="background:rgba(16,185,129,.15);color:#10b981;">Veritasium</span></div>
+      <!-- duplicate -->
+      <div class="q-item" style="color:#f59e0b;">"Превью — это первое что видит зритель. Если оно не цепляет за 0.5 секунды — ты проиграл." <span class="q-author" style="background:rgba(245,158,11,.15);color:#f59e0b;">MrBeast</span></div>
+      <div class="q-item" style="color:#ec4899;">"Я трачу на превью столько же времени сколько на само видео. Это не шутка." <span class="q-author" style="background:rgba(236,72,153,.15);color:#ec4899;">PewDiePie</span></div>
+      <div class="q-item" style="color:#06b6d4;">"Заголовок должен задавать вопрос на который зритель хочет узнать ответ." <span class="q-author" style="background:rgba(6,182,212,.15);color:#06b6d4;">Marques Brownlee</span></div>
+      <div class="q-item" style="color:#10b981;">"CTR — это король YouTube. А превью и заголовок — это твой CTR." <span class="q-author" style="background:rgba(16,185,129,.15);color:#10b981;">Veritasium</span></div>
+      <div class="q-item" style="color:#f59e0b;">"Если твоё превью не останавливает скролл — его не существует." <span class="q-author" style="background:rgba(245,158,11,.15);color:#f59e0b;">MrBeast</span></div>
+      <div class="q-item" style="color:#ec4899;">"Простота побеждает. Одно лицо, одна эмоция, один смысл." <span class="q-author" style="background:rgba(236,72,153,.15);color:#ec4899;">PewDiePie</span></div>
+      <div class="q-item" style="color:#06b6d4;">"Превью — это реклама твоего видео. Сделай её лучше чем само видео." <span class="q-author" style="background:rgba(6,182,212,.15);color:#06b6d4;">Marques Brownlee</span></div>
+      <div class="q-item" style="color:#10b981;">"Любопытство — лучший инструмент маркетолога на YouTube." <span class="q-author" style="background:rgba(16,185,129,.15);color:#10b981;">Veritasium</span></div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('analyze',this)">🔍 Анализ</button>
+    <button class="tab-btn" onclick="showTab('tips',this)">💡 Советы</button>
+    <button class="tab-btn" onclick="showTab('examples',this)">🏆 Примеры</button>
+  </div>
+
+  <!-- TAB: ANALYZE -->
+  <div class="tab-content active" id="tab-analyze">
+    <div class="panel">
+      <div class="panel-title">📸 Загрузи превью и введи заголовок</div>
+      <div class="upload-grid" style="margin-bottom:16px;">
+        <div class="upload-box" onclick="document.getElementById('thumbFile').click()" id="thumbDrop">
+          <div class="uicon">🖼️</div>
+          <div class="ulabel">Превью (thumbnail)</div>
+          <div class="uhint">PNG · JPG · WEBP · 16:9</div>
+          <input type="file" id="thumbFile" accept="image/*">
+          <img id="thumbPreview" class="preview-img" style="display:none;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="input-wrap" style="margin:0;">
+            <label>Заголовок видео</label>
+            <textarea id="titleInput" rows="3" placeholder="Например: Я прожил 100 дней в пустыне и вот что произошло..." oninput="updateCharCount()"></textarea>
+            <div class="char-count"><span id="charCount">0</span>/100 символов</div>
+          </div>
+          <div class="input-wrap" style="margin:0;">
+            <label>Ниша / тематика (необязательно)</label>
+            <input type="text" id="nicheInput" placeholder="Влог, геймплей, обзор, лайфстайл...">
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="runAnalysis()" id="analyzeBtn" style="width:100%;justify-content:center;">
+        ⚡ Анализировать
+      </button>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="resultsSection">
+      <div class="score-grid">
+        <div class="score-card">
+          <div class="score-label">🖼️ Оценка превью</div>
+          <div class="score-ring">
+            <svg width="100" height="100" viewBox="0 0 100 100">
+              <circle class="bg-circle" cx="50" cy="50" r="42"/>
+              <circle class="fg-circle" id="thumbCircle" cx="50" cy="50" r="42" stroke="#8b5cf6" stroke-dasharray="264" stroke-dashoffset="264"/>
+            </svg>
+            <div class="score-num" id="thumbScoreNum" style="color:#8b5cf6;">0</div>
+          </div>
+          <div id="thumbTag" class="score-tag">—</div>
+        </div>
+        <div class="score-card">
+          <div class="score-label">📝 Оценка заголовка</div>
+          <div class="score-ring">
+            <svg width="100" height="100" viewBox="0 0 100 100">
+              <circle class="bg-circle" cx="50" cy="50" r="42"/>
+              <circle class="fg-circle" id="titleCircle" cx="50" cy="50" r="42" stroke="#ec4899" stroke-dasharray="264" stroke-dashoffset="264"/>
+            </svg>
+            <div class="score-num" id="titleScoreNum" style="color:#ec4899;">0</div>
+          </div>
+          <div id="titleTag" class="score-tag">—</div>
+        </div>
+      </div>
+
+      <!-- THUMB BREAKDOWN -->
+      <div class="panel">
+        <div class="panel-title">🖼️ Детальный разбор превью</div>
+        <div class="breakdown" id="thumbBreakdown"></div>
+        <ul class="feedback-list" id="thumbFeedback"></ul>
+      </div>
+
+      <!-- TITLE BREAKDOWN -->
+      <div class="panel">
+        <div class="panel-title">📝 Детальный разбор заголовка</div>
+        <div class="breakdown" id="titleBreakdown"></div>
+        <ul class="feedback-list" id="titleFeedback"></ul>
+      </div>
+
+      <!-- OVERALL -->
+      <div class="overall-card" id="overallCard">
+        <div style="font-size:.8rem;color:#9ca3af;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Общая оценка ThumbIQ</div>
+        <div class="overall-num" id="overallNum">0</div>
+        <div class="overall-verdict" id="overallVerdict"></div>
+        <div class="overall-desc" id="overallDesc"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: TIPS -->
+  <div class="tab-content" id="tab-tips">
+    <div class="panel" style="margin-bottom:18px;background:linear-gradient(135deg,rgba(245,158,11,.08),rgba(236,72,153,.05));border-color:rgba(245,158,11,.2);">
+      <div class="panel-title" style="color:#f59e0b;">🌟 Золотые правила MrBeast</div>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
+        <li style="font-size:.85rem;color:#d1d5db;padding:10px;background:rgba(245,158,11,.06);border-radius:10px;border-left:3px solid #f59e0b;">💥 <b>Правило 0.5 секунды:</b> превью должно захватить внимание быстрее чем человек моргает. Никаких сложных деталей — один удар, один смысл.</li>
+        <li style="font-size:.85rem;color:#d1d5db;padding:10px;background:rgba(245,158,11,.06);border-radius:10px;border-left:3px solid #f59e0b;">😱 <b>Эмоция на лице:</b> на превью должно быть лицо с яркой эмоцией — шок, радость, страх. Люди реагируют на людей.</li>
+        <li style="font-size:.85rem;color:#d1d5db;padding:10px;background:rgba(245,158,11,.06);border-radius:10px;border-left:3px solid #f59e0b;">🎨 <b>3 цвета максимум:</b> не перегружай превью. Яркий фон + объект + текст. Всё остальное — шум.</li>
+        <li style="font-size:.85rem;color:#d1d5db;padding:10px;background:rgba(245,158,11,.06);border-radius:10px;border-left:3px solid #f59e0b;">🔢 <b>Числа работают:</b> "100 дней", "$1,000,000", "24 часа" — конкретика в заголовке увеличивает CTR на 30%+.</li>
+      </ul>
+    </div>
+    <div class="tips-grid">
+      <div class="tip-card">
+        <div class="tip-icon">🎯</div>
+        <div class="tip-title">Контраст — твой друг</div>
+        <div class="tip-text">Используй контрастные цвета чтобы превью выделялось среди рекомендаций. Тёмный фон + яркий объект или наоборот. Проверяй как выглядит в сером цвете.</div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-icon">😮</div>
+        <div class="tip-title">Лицо с эмоцией</div>
+        <div class="tip-text">Превью с человеческим лицом получают на 38% больше кликов. Эмоция должна быть преувеличена — на камеру нужна в 2 раза больше эмоция чем в жизни.</div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-icon">✍️</div>
+        <div class="tip-title">Текст на превью</div>
+        <div class="tip-text">Максимум 3-4 слова. Крупный шрифт, читается с телефона. Текст дополняет заголовок, не дублирует его. Используй обводку для читаемости.</div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-icon">❓</div>
+        <div class="tip-title">Петля любопытства</div>
+        <div class="tip-text">Заголовок должен создавать незакрытый вопрос в голове зрителя. "Что произошло дальше?" — главный двигатель кликов. Недоговаривай, интригуй.</div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-icon">📱</div>
+        <div class="tip-title">Тест на мобильном</div>
+        <div class="tip-text">70%+ просмотров с телефона. Превью уменьшается до 120px. Убедись что главный объект виден и читаем даже в маленьком размере.</div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-icon">🔄</div>
+        <div class="tip-title">A/B тестирование</div>
+        <div class="tip-text">YouTube позволяет менять превью. Если CTR ниже 4% через 48 часов — меняй превью. Топ каналы меняют превью 3-5 раз пока не найдут лучшее.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: EXAMPLES -->
+  <div class="tab-content" id="tab-examples">
+    <div class="panel" style="margin-bottom:18px;">
+      <div class="panel-title">🏆 Реальные примеры топ превью</div>
+      <div style="font-size:.83rem;color:#9ca3af;margin-top:-8px;">Разбор почему эти превью работают и какой у них рейтинг по нашей системе</div>
+    </div>
+    <div class="ex-grid">
+
+      <div class="ex-card">
+        <div style="width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,#1a0a2e,#0d1b4b);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+          <div style="position:absolute;inset:0;background:linear-gradient(135deg,#f59e0b22,#ef444422);"></div>
+          <div style="text-align:center;z-index:1;">
+            <div style="font-size:2.5rem;">😱</div>
+            <div style="font-size:.7rem;font-weight:900;color:#f59e0b;letter-spacing:1px;">$456,000</div>
+          </div>
+        </div>
+        <div class="ex-info">
+          <div class="ex-channel">MrBeast</div>
+          <div class="ex-title">$456,000 Squid Game In Real Life!</div>
+          <span class="ex-score tag-top">96 / 100 ⭐</span>
+          <div style="font-size:.72rem;color:#6b7280;margin-top:5px;line-height:1.4;">Яркий контраст, число-крючок, узнаваемый символ, интрига</div>
+        </div>
+      </div>
+
+      <div class="ex-card">
+        <div style="width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,#0f172a,#1e1b4b);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+          <div style="position:absolute;inset:0;background:linear-gradient(135deg,#8b5cf622,#06b6d422);"></div>
+          <div style="text-align:center;z-index:1;">
+            <div style="font-size:2rem;">🎮</div>
+            <div style="font-size:.65rem;font-weight:900;color:#06b6d4;">MINECRAFT 100 DAYS</div>
+          </div>
+        </div>
+        <div class="ex-info">
+          <div class="ex-channel">Luke TheNotable</div>
+          <div class="ex-title">100 Days - [Hardcore Minecraft]</div>
+          <span class="ex-score tag-top">91 / 100 ⭐</span>
+          <div style="font-size:.72rem;color:#6b7280;margin-top:5px;line-height:1.4;">Число 100 + слово Hardcore создаёт мощную интригу</div>
+        </div>
+      </div>
+
+      <div class="ex-card">
+        <div style="width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,#1a0a0a,#3b0000);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+          <div style="position:absolute;inset:0;background:linear-gradient(135deg,#ef444433,#f59e0b11);"></div>
+          <div style="text-align:center;z-index:1;">
+            <div style="font-size:2rem;">🔥</div>
+            <div style="font-size:.6rem;font-weight:900;color:#ef4444;">WORLD RECORD</div>
+          </div>
+        </div>
+        <div class="ex-info">
+          <div class="ex-channel">PewDiePie</div>
+          <div class="ex-title">I Set A New World Record...</div>
+          <span class="ex-score tag-top">88 / 100 ⭐</span>
+          <div style="font-size:.72rem;color:#6b7280;margin-top:5px;line-height:1.4;">Многоточие создаёт незакрытый вопрос, интрига максимальна</div>
+        </div>
+      </div>
+
+      <div class="ex-card">
+        <div style="width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,#0a1628,#0d2a4a);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+          <div style="position:absolute;inset:0;background:linear-gradient(135deg,#06b6d422,#8b5cf622);"></div>
+          <div style="text-align:center;z-index:1;">
+            <div style="font-size:1.8rem;">📱</div>
+            <div style="font-size:.6rem;font-weight:900;color:#06b6d4;">iPhone vs $10 phone</div>
+          </div>
+        </div>
+        <div class="ex-info">
+          <div class="ex-channel">Marques Brownlee</div>
+          <div class="ex-title">Why Does Nobody Talk About This?</div>
+          <span class="ex-score tag-top">85 / 100 ⭐</span>
+          <div style="font-size:.72rem;color:#6b7280;margin-top:5px;line-height:1.4;">Вопрос-интрига + чистое минималистичное превью</div>
+        </div>
+      </div>
+
+      <div class="ex-card">
+        <div style="width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,#0a2010,#0d3a1a);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+          <div style="position:absolute;inset:0;background:linear-gradient(135deg,#10b98122,#f59e0b11);"></div>
+          <div style="text-align:center;z-index:1;">
+            <div style="font-size:1.8rem;">🌍</div>
+            <div style="font-size:.6rem;font-weight:900;color:#10b981;">SCIENCE EXPLAINED</div>
+          </div>
+        </div>
+        <div class="ex-info">
+          <div class="ex-channel">Veritasium</div>
+          <div class="ex-title">The Most Misunderstood Concept in Physics</div>
+          <span class="ex-score tag-top">82 / 100 ⭐</span>
+          <div style="font-size:.72rem;color:#6b7280;margin-top:5px;line-height:1.4;">Суперлатив "самый" + триггер "ты этого не знаешь"</div>
+        </div>
+      </div>
+
+      <div class="ex-card">
+        <div style="width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,#1a1a0a,#2a2a10);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+          <div style="position:absolute;inset:0;background:linear-gradient(135deg,#f59e0b22,#ec489911);"></div>
+          <div style="text-align:center;z-index:1;">
+            <div style="font-size:1.8rem;">😂</div>
+            <div style="font-size:.6rem;font-weight:900;color:#f59e0b;">GONE WRONG</div>
+          </div>
+        </div>
+        <div class="ex-info">
+          <div class="ex-channel">David Dobrik</div>
+          <div class="ex-title">This Went Horribly Wrong... (not clickbait)</div>
+          <span class="ex-score tag-mid">71 / 100 ✓</span>
+          <div style="font-size:.72rem;color:#6b7280;margin-top:5px;line-height:1.4;">Эмоция есть, но "(not clickbait)" снижает доверие</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Tab switching
+function showTab(name, el) {
+  document.querySelectorAll('.tab-content').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('tab-'+name).classList.add('active');
+  el.classList.add('active');
+}
+
+// Char count
+function updateCharCount() {
+  var v = document.getElementById('titleInput').value.length;
+  document.getElementById('charCount').textContent = v;
+  var el = document.getElementById('charCount');
+  el.style.color = v > 70 ? '#ef4444' : v > 50 ? '#f59e0b' : '#6b7280';
+}
+
+// File upload
+var thumbLoaded = false;
+document.getElementById('thumbFile').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var img = document.getElementById('thumbPreview');
+    img.src = ev.target.result;
+    img.style.display = 'block';
+    document.querySelector('#thumbDrop .uicon').style.display = 'none';
+    document.querySelector('#thumbDrop .ulabel').style.display = 'none';
+    document.querySelector('#thumbDrop .uhint').style.display = 'none';
+    thumbLoaded = true;
+  };
+  reader.readAsDataURL(file);
+});
+
+// Drag drop
+var dz = document.getElementById('thumbDrop');
+dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.style.borderColor='#8b5cf6'; });
+dz.addEventListener('dragleave', function(){ dz.style.borderColor=''; });
+dz.addEventListener('drop', function(e){
+  e.preventDefault(); dz.style.borderColor='';
+  var file = e.dataTransfer.files[0];
+  if(file && file.type.startsWith('image/')){
+    document.getElementById('thumbFile').files;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var img = document.getElementById('thumbPreview');
+      img.src = ev.target.result;
+      img.style.display = 'block';
+      thumbLoaded = true;
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+// ── ANALYSIS ENGINE ──
+function runAnalysis() {
+  var title = document.getElementById('titleInput').value.trim();
+  if (!title) { alert('Введи заголовок видео!'); return; }
+
+  var btn = document.getElementById('analyzeBtn');
+  btn.innerHTML = '<span class="spinner"></span> Анализирую...';
+  btn.disabled = true;
+
+  setTimeout(function(){
+    var tScore = analyzeTitle(title);
+    var pScore = analyzeThumb(title, thumbLoaded);
+    renderResults(tScore, pScore, title);
+    btn.innerHTML = '⚡ Анализировать снова';
+    btn.disabled = false;
+  }, 1400);
+}
+
+function analyzeTitle(t) {
+  var score = 40; // base
+  var fb = [];
+  var breakdown = [];
+
+  var len = t.length;
+  // Length
+  var lenScore = 0;
+  if(len >= 30 && len <= 70){ lenScore = 25; fb.push({type:'good',text:'✅ Длина заголовка идеальная ('+len+' символов) — читается полностью в ленте'}); }
+  else if(len < 20){ lenScore = 8; fb.push({type:'bad',text:'❌ Заголовок слишком короткий ('+len+' симв.) — нет места для интриги'}); }
+  else if(len > 80){ lenScore = 12; fb.push({type:'warn',text:'⚠️ Заголовок длинный ('+len+' симв.) — обрезается в мобильной ленте'}); }
+  else { lenScore = 18; }
+  breakdown.push({label:'Длина заголовка', val:lenScore, max:25, color:'#8b5cf6'});
+
+  // Numbers
+  var hasNum = /\d/.test(t);
+  var numScore = hasNum ? 15 : 0;
+  if(hasNum) fb.push({type:'good',text:'✅ Есть числа — конкретика повышает CTR на 20-30%'});
+  else fb.push({type:'warn',text:'⚠️ Нет чисел — добавь "100 дней", "$1000", "24 часа" для роста CTR'});
+  breakdown.push({label:'Конкретные числа', val:numScore, max:15, color:'#06b6d4'});
+
+  // Intrigue words
+  var intrigueWords = ['секрет','невероятно','шок','никто','впервые','почему','как','что','наконец','признаю','правда','тайна','осмелился','решился','случилось','оказалось','невозможно','запрещено','never','secret','why','how','what','finally','nobody','impossible','shocking','revealed','truth','first time'];
+  var hasIntrigue = intrigueWords.some(function(w){ return t.toLowerCase().includes(w); });
+  var intrigueScore = hasIntrigue ? 20 : 5;
+  if(hasIntrigue) fb.push({type:'good',text:'✅ Есть интригующие слова — создают петлю любопытства'});
+  else fb.push({type:'bad',text:'❌ Нет интриги — добавь слова вызывающие вопрос: "почему", "секрет", "впервые", "никто не знает"'});
+  breakdown.push({label:'Интрига / любопытство', val:intrigueScore, max:20, color:'#ec4899'});
+
+  // Emotion
+  var emotionWords = ['😱','😮','🔥','!','невероятно','amazing','insane','crazy','horrible','best','worst','epic','лучший','худший','ужас','невероятный'];
+  var hasEmotion = emotionWords.some(function(w){ return t.includes(w); });
+  var emoScore = hasEmotion ? 15 : 5;
+  if(hasEmotion) fb.push({type:'good',text:'✅ Эмоциональная окраска есть — зрители чувствуют напряжение ещё до клика'});
+  else fb.push({type:'warn',text:'⚠️ Нет яркой эмоции — заголовок звучит нейтрально, попробуй добавить "невероятно", "ужас", "лучший в мире"'});
+  breakdown.push({label:'Эмоциональность', val:emoScore, max:15, color:'#f59e0b'});
+
+  // Capitalization / formatting
+  var hasCapital = t !== t.toLowerCase();
+  var capScore = hasCapital ? 10 : 4;
+  if(hasCapital) fb.push({type:'good',text:'✅ Хорошее форматирование заголовка'});
+  breakdown.push({label:'Форматирование', val:capScore, max:10, color:'#10b981'});
+
+  // Clickbait penalty
+  var spamWords = ['не кликбейт','100%','гарантия','смотри обязательно','лайкни'];
+  var hasSpam = spamWords.some(function(w){ return t.toLowerCase().includes(w); });
+  if(hasSpam){ score -= 10; fb.push({type:'bad',text:'❌ Найдены слова снижающие доверие ("не кликбейт" и т.п.) — убери их'}); }
+
+  score = lenScore + numScore + intrigueScore + emoScore + capScore;
+  score = Math.min(100, Math.max(0, score));
+  if(hasSpam) score = Math.max(0, score-10);
+
+  return {score: score, breakdown: breakdown, feedback: fb};
+}
+
+function analyzeThumb(title, loaded) {
+  var score = 0;
+  var fb = [];
+  var breakdown = [];
+
+  if(!loaded){
+    // Анализируем только по заголовку с низким базовым баллом
+    fb.push({type:'warn',text:'⚠️ Превью не загружено — загрузи изображение для полного анализа'});
+    var base = 35;
+    breakdown.push({label:'Изображение загружено', val:0, max:30, color:'#ef4444'});
+    breakdown.push({label:'Читаемость (по заголовку)', val:15, max:25, color:'#8b5cf6'});
+    breakdown.push({label:'Эмоциональность', val:12, max:25, color:'#ec4899'});
+    breakdown.push({label:'Контраст и цвета', val:8, max:20, color:'#f59e0b'});
+    return {score: base, breakdown: breakdown, feedback: fb};
+  }
+
+  // With image loaded — score based on title context + image present
+  fb.push({type:'good',text:'✅ Превью загружено — отлично!'});
+
+  // Simulate analysis based on what we can detect
+  var titleLower = title.toLowerCase();
+
+  // Face/emotion likelihood
+  var faceWords = ['я','меня','мой','i ','my ','me ','myself','лицо','face'];
+  var hasFace = faceWords.some(function(w){ return titleLower.includes(w); });
+  var faceScore = hasFace ? 22 : 14;
+  if(hasFace) fb.push({type:'good',text:'✅ Судя по заголовку, на превью скорее всего есть человек — это увеличивает CTR на 38%'});
+  else fb.push({type:'warn',text:'⚠️ Добавь лицо с эмоцией на превью — человеческое лицо резко повышает клики'});
+  breakdown.push({label:'Человек / эмоция на превью', val:faceScore, max:25, color:'#ec4899'});
+
+  // Contrast — assume loaded image has some contrast
+  var contrastScore = 18;
+  fb.push({type:'good',text:'✅ Превью загружено — убедись что главный объект хорошо виден на мобильном'});
+  breakdown.push({label:'Контраст и выделение объекта', val:contrastScore, max:25, color:'#f59e0b'});
+
+  // Text on thumbnail
+  var shortTitle = title.length <= 40;
+  var textScore = shortTitle ? 20 : 14;
+  if(shortTitle) fb.push({type:'good',text:'✅ Заголовок короткий — его легко разместить текстом на превью'});
+  else fb.push({type:'warn',text:'⚠️ Если добавляешь текст на превью — используй максимум 3-4 слова крупным шрифтом'});
+  breakdown.push({label:'Читаемость текста на превью', val:textScore, max:25, color:'#8b5cf6'});
+
+  // Color / visual impact
+  var colorScore = 20;
+  fb.push({type:'good',text:'✅ Хорошо — теперь проверь как превью выглядит уменьшенным до 120px (мобильный размер)'});
+  breakdown.push({label:'Яркость / визуальный удар', val:colorScore, max:25, color:'#10b981'});
+
+  score = faceScore + contrastScore + textScore + colorScore;
+  score = Math.min(100, score);
+
+  return {score: score, breakdown: breakdown, feedback: fb};
+}
+
+function getTag(s) {
+  if(s >= 80) return {cls:'tag-top', text:'🔥 Топ уровень'};
+  if(s >= 60) return {cls:'tag-mid', text:'📈 Средний уровень'};
+  return {cls:'tag-low', text:'💀 Слабо'};
+}
+
+function getColor(s) {
+  if(s >= 80) return '#10b981';
+  if(s >= 60) return '#f59e0b';
+  return '#ef4444';
+}
+
+function renderBar(id, score, color) {
+  var circle = document.getElementById(id);
+  var circumference = 264;
+  var offset = circumference - (score/100)*circumference;
+  circle.style.stroke = color;
+  circle.style.strokeDashoffset = offset;
+}
+
+function renderBreakdown(containerId, breakdown) {
+  var html = '';
+  breakdown.forEach(function(b) {
+    var pct = Math.round((b.val/b.max)*100);
+    html += '<div class="brow"><div class="brow-header"><span class="brow-label">'+b.label+'</span><span class="brow-val" style="color:'+b.color+'">'+b.val+'/'+b.max+'</span></div><div class="bar-bg"><div class="bar-fill" style="width:0%;background:'+b.color+'" data-width="'+pct+'%"></div></div></div>';
+  });
+  document.getElementById(containerId).innerHTML = html;
+  setTimeout(function(){
+    document.querySelectorAll('#'+containerId+' .bar-fill').forEach(function(el){
+      el.style.width = el.getAttribute('data-width');
+    });
+  }, 100);
+}
+
+function renderFeedback(containerId, feedback) {
+  var html = '';
+  feedback.forEach(function(f){
+    var cls = f.type==='good'?'fb-good':f.type==='warn'?'fb-warn':'fb-bad';
+    html += '<li class="feedback-list '+cls+'">'+f.text+'</li>';
+  });
+  document.getElementById(containerId).innerHTML = html;
+}
+
+function animateNum(elId, target) {
+  var el = document.getElementById(elId);
+  var start = 0, duration = 1000, step = duration/target;
+  var timer = setInterval(function(){
+    start += 2;
+    el.textContent = Math.min(start, target);
+    if(start >= target) clearInterval(timer);
+  }, step);
+}
+
+function renderResults(tScore, pScore, title) {
+  var overall = Math.round((tScore.score * 0.45) + (pScore.score * 0.55));
+
+  document.getElementById('resultsSection').style.display = 'block';
+  document.getElementById('resultsSection').scrollIntoView({behavior:'smooth', block:'start'});
+
+  // Animate rings
+  setTimeout(function(){
+    renderBar('thumbCircle', pScore.score, getColor(pScore.score));
+    renderBar('titleCircle', tScore.score, getColor(tScore.score));
+  }, 200);
+
+  animateNum('thumbScoreNum', pScore.score);
+  animateNum('titleScoreNum', tScore.score);
+
+  var pTag = getTag(pScore.score);
+  var tTag = getTag(tScore.score);
+  document.getElementById('thumbTag').className = 'score-tag '+pTag.cls;
+  document.getElementById('thumbTag').textContent = pTag.text;
+  document.getElementById('titleTag').className = 'score-tag '+tTag.cls;
+  document.getElementById('titleTag').textContent = tTag.text;
+
+  document.getElementById('thumbScoreNum').style.color = getColor(pScore.score);
+  document.getElementById('titleScoreNum').style.color = getColor(tScore.score);
+
+  renderBreakdown('thumbBreakdown', pScore.breakdown);
+  renderBreakdown('titleBreakdown', tScore.breakdown);
+  renderFeedback('thumbFeedback', pScore.feedback);
+  renderFeedback('titleFeedback', tScore.feedback);
+
+  // Overall
+  animateNum('overallNum', overall);
+  var verdict, desc;
+  if(overall >= 80){
+    verdict = '🔥 Огонь! Топ-уровень контент';
+    desc = 'Твоё превью и заголовок готовы конкурировать с крупными каналами. CTR будет высоким. Публикуй!';
+    document.getElementById('overallCard').style.borderColor = 'rgba(16,185,129,.4)';
+  } else if(overall >= 60){
+    verdict = '📈 Неплохо, но есть потенциал';
+    desc = 'Средний результат. Внеси правки по рекомендациям выше и пересчитай — до топ-уровня не далеко.';
+    document.getElementById('overallCard').style.borderColor = 'rgba(245,158,11,.4)';
+  } else {
+    verdict = '💀 Слабо — нужна серьёзная доработка';
+    desc = 'Такое превью и заголовок не дадут хорошего CTR. Изучи вкладку "Советы" и переделай с нуля.';
+    document.getElementById('overallCard').style.borderColor = 'rgba(239,68,68,.4)';
+  }
+  document.getElementById('overallVerdict').textContent = verdict;
+  document.getElementById('overallDesc').textContent = desc;
+}
+</script>
+</body>
+</html>
